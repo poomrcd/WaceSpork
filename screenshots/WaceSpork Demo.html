@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="WaceSpork — a local-first personal workspace (Demo).">
+<meta name="description" content="WaceSpork — a local-first personal workspace (Demo). IndexedDB-backed, 50 MB per-file uploads.">
 <title>WaceSpork — Personal Workspace (Demo)</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230f172a'/%3E%3Cstop offset='1' stop-color='%231e293b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='38' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3EW%3C/text%3E%3C/svg%3E">
 <style>
@@ -73,7 +73,6 @@ p{margin:0}button,input,select,textarea{font:inherit;color:inherit}a{color:var(-
 .icon-btn.sm{width:28px;height:28px;border-radius:7px}
 .icon-btn[disabled]{opacity:.3;pointer-events:none}
 
-/* Demo additions */
 .demo-badge{display:inline-flex;align-items:center;font-size:.6rem;font-weight:800;letter-spacing:.1em;padding:2.5px 7px;border-radius:6px;background:linear-gradient(135deg,var(--buy1),var(--buy2));color:#fff;margin-left:4px;text-transform:uppercase;box-shadow:0 2px 6px rgba(245,158,11,.35);flex:none}
 .buy-btn{background:linear-gradient(135deg,var(--buy1),var(--buy2)) !important;border-color:transparent !important;color:#fff !important;box-shadow:0 4px 14px rgba(245,158,11,.3) !important;font-weight:650 !important}
 .buy-btn:hover{filter:brightness(1.06)}
@@ -512,7 +511,6 @@ input[type="range"].input{padding:0;height:auto;border:0;background:transparent;
 .selection-bar .sb-count{font-weight:600;font-size:.88rem;color:var(--accent);min-width:90px}
 .selection-bar .sb-grow{flex:1}
 
-/* Notepad select-mode: stacked layout so it always fits inside the 266px pane */
 .notes-side-head .sel-bar-stack{display:flex;flex-direction:column;gap:6px;width:100%;box-sizing:border-box;overflow:hidden}
 .notes-side-head .sel-bar-stack .sel-bar-mini{
   display:flex;align-items:center;justify-content:center;gap:6px;
@@ -708,17 +706,19 @@ input[type="range"].input{padding:0;height:auto;border:0;background:transparent;
 <div id="modal-root"></div>
 
 <script>
-    "use strict";
-/* WaceSpork 3.5.4 — DEMO EDITION
+"use strict";
+/* WaceSpork 3.6.0 — DEMO EDITION
    Demo limits (buy to unlock): 3 widgets · 3 events · 3 notes · 3 contacts ·
    3 meetings · 3 Personal Drive files · 3 Personal Album images · 3 shortcuts ·
    3 apps.
    Buy: https://poomrcd.gumroad.com/l/cavqna
 
-   Theme note: base palette switched to a neutral monochrome look
-   (near-black accent on soft light-gray, matching the 19G full edition).
-   The orange "Buy Full Version" button and the DEMO badge intentionally
-   remain warm so the upgrade CTA stands out.
+   Storage note (v3.6.0):
+   The workspace envelope is now stored in IndexedDB for high-capacity local
+   archiving. Security record and small prefs still live in localStorage.
+   Legacy localStorage workspaces are auto-migrated on first unlock.
+
+   Per-file upload cap: 50 MB for both Personal Drive and Personal Album.
 */
 
 window.addEventListener("error", (e)=>{
@@ -838,7 +838,6 @@ function loadImage(dataUrl){ return new Promise((resolve,reject)=>{
   const img = new Image(); img.onload=()=>resolve(img);
   img.onerror=()=>reject(new Error("Could not load that image.")); img.src=dataUrl; }); }
 
-/* Demo helpers */
 function openDemoUpsell(label, limit){
   UI.openModal({
     title: "Demo limit reached",
@@ -883,7 +882,6 @@ function demoBlock(kind, label, count){
   return true;
 }
 
-/* MIME and extension helpers */
 const MIME_FROM_EXT = {
   csv:"text/csv", txt:"text/plain", html:"text/html", htm:"text/html",
   json:"application/json", md:"text/markdown", xml:"text/xml",
@@ -965,25 +963,96 @@ const Security = (() => {
   };
 })();
 
-/* [C] STORAGE */
+/* [C] STORAGE — IndexedDB layer + Store */
+const IDB = {
+  dbName: "wacespork",
+  dbVersion: 1,
+  storeName: "workspace",
+  _db: null,
+  async open(){
+    if(this._db) return this._db;
+    return new Promise((resolve, reject)=>{
+      let req;
+      try{ req = indexedDB.open(this.dbName, this.dbVersion); }
+      catch(e){ reject(e); return; }
+      req.onupgradeneeded = (event)=>{
+        const db = event.target.result;
+        if(!db.objectStoreNames.contains(IDB.storeName)){
+          db.createObjectStore(IDB.storeName);
+        }
+      };
+      req.onsuccess = ()=>{ this._db = req.result; resolve(this._db); };
+      req.onerror = ()=> reject(req.error || new Error("Could not open IndexedDB."));
+      req.onblocked = ()=> reject(new Error("IndexedDB is blocked by another tab."));
+    });
+  },
+  async get(key){
+    const db = await this.open();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(this.storeName, "readonly");
+      const store = tx.objectStore(this.storeName);
+      const req = store.get(key);
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    });
+  },
+  async set(key, value){
+    const db = await this.open();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(this.storeName, "readwrite");
+      const store = tx.objectStore(this.storeName);
+      const req = store.put(value, key);
+      req.onsuccess = ()=> resolve();
+      req.onerror = ()=> reject(req.error);
+    });
+  },
+  async delete(key){
+    const db = await this.open();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(this.storeName, "readwrite");
+      const store = tx.objectStore(this.storeName);
+      const req = store.delete(key);
+      req.onsuccess = ()=> resolve();
+      req.onerror = ()=> reject(req.error);
+    });
+  },
+  async clear(){
+    const db = await this.open();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(this.storeName, "readwrite");
+      const store = tx.objectStore(this.storeName);
+      const req = store.clear();
+      req.onsuccess = ()=> resolve();
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+};
+const IDB_WORKSPACE_KEY = "current";
+
 const SCHEMA_VERSION = 9;
-const STORAGE_LIMIT_BYTES = 5 * 1024 * 1024;
-const STORAGE_WARN_PCT = 80;
-const IMG_MAX_DIM = 1600;
-const IMG_JPEG_QUALITY = 0.7;
-const IMG_MAX_BYTES = 500 * 1024;
+
+/* IndexedDB gives us room for large, per-file 50 MB uploads. The soft budget
+   below is used only for warning and estimate purposes — it is not a hard
+   browser ceiling. */
+const STORAGE_LIMIT_BYTES     = 500 * 1024 * 1024;   // 500 MB soft budget
+const STORAGE_WARN_PCT        = 80;
+const PER_FILE_MAX_BYTES      = 50 * 1024 * 1024;    // 50 MB shared cap for Album + Drive sources
+const ALBUM_MAX_SOURCE_BYTES  = PER_FILE_MAX_BYTES;
+const DRIVE_FILE_MAX_BYTES    = PER_FILE_MAX_BYTES;
+const DRIVE_FILE_WARN_BYTES   = 20 * 1024 * 1024;    // warn above 20 MB
+const DRIVE_TOTAL_WARN_BYTES  = 200 * 1024 * 1024;   // warn above 200 MB stored
+
+const ALBUM_MAX_DIM = 1600;
+const ALBUM_JPEG_QUALITY = 0.7;
+
 const HTML_APP_WARN_BYTES = 500 * 1024;
 const APP_STORAGE_MAX_VALUE = 500 * 1024;
 const APP_STORAGE_MAX_TOTAL = 1024 * 1024;
 const APP_FILE_MAX_BYTES   = 1024 * 1024;
 const APP_FILES_TOTAL_MAX  = 2 * 1024 * 1024;
 const APP_FILE_WARN_BYTES  = 750 * 1024;
-const ALBUM_MAX_DIM = 1600;
-const ALBUM_JPEG_QUALITY = 0.7;
-const DRIVE_FILE_MAX_BYTES = 3 * 1024 * 1024;
-const DRIVE_FILE_WARN_BYTES = 1 * 1024 * 1024;
-const DRIVE_TOTAL_WARN_BYTES = 2 * 1024 * 1024;
-const LS = { WORKSPACE:"wacespork.workspace", SECURITY:"wacespork.security", PREFS:"wacespork.prefs" };
+
+const LS = { LEGACY_WORKSPACE:"wacespork.workspace", SECURITY:"wacespork.security", PREFS:"wacespork.prefs" };
 
 function defaultSettings(theme){ return {
   theme: theme||"light", autoLockMinutes: 2,
@@ -1021,12 +1090,15 @@ function demoApps(){ const A=(name,url,color)=>({id:uid(),type:"link",name,url,c
 
 const Store = {
   data: null, key: null, _saveTimer: null, _lastSaved: null,
+  /* The security record is a tiny JSON blob in localStorage (required to know
+     whether a workspace exists and to verify the PIN before decryption). */
   exists(){ return !!localStorage.getItem(LS.SECURITY); },
   prefs(){ try{ return JSON.parse(localStorage.getItem(LS.PREFS))||{}; }catch{ return {}; } },
   setPrefs(patch){ const next={...this.prefs(),...patch};
     try{ localStorage.setItem(LS.PREFS, JSON.stringify(next)); }catch(e){}
     return next; },
   securityRecord(){ try{ return JSON.parse(localStorage.getItem(LS.SECURITY)); }catch{ return null; } },
+
   async create(pin, profile, theme, withDemo, importedWorkspace){
     const { record, key } = await Security.createRecord(pin);
     localStorage.setItem(LS.SECURITY, JSON.stringify(record));
@@ -1037,41 +1109,77 @@ const Store = {
     this.setPrefs({ theme: effectiveTheme });
     if(this.data.profile){ this.setPrefs({ lastName: this.data.profile.name || "Me", lastAvatar: this.data.profile.avatar || null }); }
     await this.persistNow();
-    return this.data; },
+    return this.data;
+  },
+
   async unlock(pin){
     const record = this.securityRecord();
     if(!record) throw new Error("No workspace found on this device.");
     const key = await Security.unlock(pin, record);
-    const raw = localStorage.getItem(LS.WORKSPACE);
-    if(raw){
-      let envelope; try{ envelope = JSON.parse(raw); }catch{ throw new Error("Stored workspace data is damaged."); }
+
+    /* Primary source: IndexedDB */
+    let envelope = null;
+    try{ envelope = await IDB.get(IDB_WORKSPACE_KEY); }
+    catch(e){ console.warn("[WaceSpork] IndexedDB read failed, falling back to localStorage:", e); }
+
+    /* Migration path: legacy localStorage workspace envelope */
+    if(!envelope){
+      const legacy = localStorage.getItem(LS.LEGACY_WORKSPACE);
+      if(legacy){
+        try{
+          envelope = JSON.parse(legacy);
+          try{ await IDB.set(IDB_WORKSPACE_KEY, envelope); localStorage.removeItem(LS.LEGACY_WORKSPACE); }
+          catch(e){ console.warn("[WaceSpork] Could not migrate legacy workspace to IndexedDB:", e); }
+        }catch(e){ envelope = null; }
+      }
+    }
+
+    if(envelope){
       this.data = await Security.decryptJSON(key, envelope);
-    } else { this.data = blankWorkspace({ name:"Me" }, this.prefs().theme||"light"); }
-    this.key = key; migrate(this.data); return this.data; },
+    } else {
+      this.data = blankWorkspace({ name:"Me" }, this.prefs().theme||"light");
+    }
+    this.key = key;
+    migrate(this.data);
+    return this.data;
+  },
+
   lock(){ clearTimeout(this._saveTimer); this._saveTimer=null; this.key=null; this.data=null; },
+
   save(){ UI.markSaving(); clearTimeout(this._saveTimer);
     this._saveTimer=setTimeout(()=>this.persistNow(), 320); },
+
   async persistNow(){
     if(!this.data) return;
     this.data.updatedAt = nowISO();
     try{
       const envelope = await Security.encryptJSON(this.key, this.data);
-      localStorage.setItem(LS.WORKSPACE, JSON.stringify(envelope));
+      await IDB.set(IDB_WORKSPACE_KEY, envelope);
+      /* Opportunistically clean the legacy localStorage slot */
+      try{ if(localStorage.getItem(LS.LEGACY_WORKSPACE)) localStorage.removeItem(LS.LEGACY_WORKSPACE); }catch(e){}
       this._lastSaved = new Date(); UI.markSaved(this._lastSaved);
       setTimeout(checkStorageWarning, 60);
     }catch(err){
+      console.error("[WaceSpork] Persist failed:", err);
       const isQuota = err && (err.name==="QuotaExceededError" || err.name==="NS_ERROR_DOM_QUOTA_REACHED" || /quota/i.test(String(err&&err.message)));
       UI.markSaveFailed();
-      UI.toast(isQuota ? "Browser storage is full. Export a backup and remove some large items."
-                       : "Could not save your workspace. Your last changes may not be stored.", "error");
-    } },
+      UI.toast(isQuota
+        ? "Browser storage is full. Export a backup and remove some large items."
+        : "Could not save your workspace. Your last changes may not be stored.", "error");
+    }
+  },
+
   async rekey(newPin){
     const { record, key } = await Security.createRecord(newPin);
     this.key = key; localStorage.setItem(LS.SECURITY, JSON.stringify(record));
-    await this.persistNow(); },
+    await this.persistNow();
+  },
+
   buildBackupObject(){
     return { format:"wacespork-backup", v:1, exportedAt:nowISO(),
-      app:{ name:"WaceSpork", schemaVersion: SCHEMA_VERSION }, workspace: this.data }; },
+      app:{ name:"WaceSpork", schemaVersion: SCHEMA_VERSION }, workspace: this.data };
+  },
+
   validateBackup(obj){
     if(!obj||typeof obj!=="object") throw new Error("That file is not valid JSON for a WaceSpork backup.");
     if(obj.format!=="wacespork-backup") throw new Error("This file was not created by WaceSpork.");
@@ -1083,10 +1191,17 @@ const Store = {
     if(!Array.isArray(w.schedule)||!Array.isArray(w.notes)||!Array.isArray(w.contacts)||
        !Array.isArray(w.meetings)||!Array.isArray(w.shortcuts)||!Array.isArray(w.apps)){
       throw new Error("The backup contains malformed list data."); }
-    return true; },
+    return true;
+  },
+
   async restore(workspace){ this.data = migrate(workspace); await this.persistNow(); return this.data; },
-  resetAll(){ this.lock();
-    [LS.WORKSPACE, LS.SECURITY, LS.PREFS].forEach((k)=>{ try{ localStorage.removeItem(k); }catch(e){} }); }
+
+  resetAll(){
+    this.lock();
+    /* Fire-and-forget IndexedDB clear; localStorage clear is synchronous */
+    try{ IDB.clear().catch((e)=>console.warn("[WaceSpork] IDB clear failed:", e)); }catch(e){}
+    [LS.LEGACY_WORKSPACE, LS.SECURITY, LS.PREFS].forEach((k)=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  }
 };
 
 function snapshotProfileToPrefs(){
@@ -1233,8 +1348,8 @@ function applyDemoData(ws){
   sampleEvents.forEach((e)=> ws.schedule.push({ id: uid(), demo: true, ...e }));
 
   const sampleNotes = [
-    { name:"Welcome.txt", content:"Welcome to WaceSpork (Demo).\n\nThis is a local-first workspace. Everything you type stays in this browser unless you export a backup.\n\nThe demo limits each collection to 3 items. Buy the full version to remove those limits.\n" },
-    { name:"Getting Started.txt", content:"Getting started\n---------------\n\n1. Your workspace auto-saves.\n2. Lock from the header or wait for the inactivity timer.\n3. HTML files are displayed as plain text — never rendered.\n4. Press Ctrl/Cmd + K to search anything in your workspace.\n5. Personal Album is a PIN-locked private image vault.\n6. Personal Drive is a PIN-locked file vault with nested folders.\n7. Demo limits: 3 widgets, 3 events, 3 notes, 3 contacts, 3 meetings, 3 shortcuts, 3 apps, 3 drive files, 3 album images.\n" }
+    { name:"Welcome.txt", content:"Welcome to WaceSpork (Demo).\n\nThis is a local-first workspace. Everything you type stays in this browser unless you export a backup.\n\nThe workspace lives in IndexedDB — plenty of room for large files.\n\nThe demo limits each collection to 3 items. Buy the full version to remove those limits.\n" },
+    { name:"Getting Started.txt", content:"Getting started\n---------------\n\n1. Your workspace auto-saves.\n2. Lock from the header or wait for the inactivity timer.\n3. HTML files are displayed as plain text — never rendered.\n4. Press Ctrl/Cmd + K to search anything in your workspace.\n5. Personal Album is a PIN-locked private image vault (up to 50 MB source per image).\n6. Personal Drive is a PIN-locked file vault with nested folders (up to 50 MB per file).\n7. Demo limits: 3 widgets, 3 events, 3 notes, 3 contacts, 3 meetings, 3 shortcuts, 3 apps, 3 drive files, 3 album images.\n" }
   ].slice(0, noteCap);
   sampleNotes.forEach((n)=> ws.notes.push({ id: uid(), demo: true, name:n.name, content:n.content, updatedAt:nowISO() }));
 
@@ -2653,7 +2768,7 @@ async function importHtmlApp(){
   if(bytes > HTML_APP_WARN_BYTES){
     const ok = await UI.confirm({
       title: "Large HTML file",
-      message: `This file is ${formatBytes(bytes)}, which is above ${formatBytes(HTML_APP_WARN_BYTES)}. It will use a noticeable share of your 5 MB storage budget. Continue?`,
+      message: `This file is ${formatBytes(bytes)}, which is above ${formatBytes(HTML_APP_WARN_BYTES)}. It will use a noticeable share of your storage budget. Continue?`,
       confirmLabel: "Import anyway"
     });
     if(!ok) return;
@@ -4308,6 +4423,10 @@ async function addAlbumImageFromFile(file){
     openDemoUpsell("Personal Album images", DEMO_LIMITS.albumFiles);
     return null;
   }
+  if(file.size > ALBUM_MAX_SOURCE_BYTES){
+    UI.toast(`Image is too large: ${formatBytes(file.size)} exceeds the ${formatBytes(ALBUM_MAX_SOURCE_BYTES)} per-file cap.`, "error");
+    return null;
+  }
   const dataUrl = await readFileAsDataUrl(file);
   const base = (file.name || "image").replace(/\.[a-z0-9]+$/i, "");
   return addAlbumImageFromDataUrl(dataUrl, base + ".jpg", "file");
@@ -4319,6 +4438,7 @@ async function fetchImageAsDataUrl(url){
   if(!resp.ok) throw new Error("Server returned HTTP " + resp.status + ".");
   const blob = await resp.blob();
   if(!blob.type || blob.type.indexOf("image/") !== 0) throw new Error("That URL did not return an image.");
+  if(blob.size > ALBUM_MAX_SOURCE_BYTES) throw new Error(`Downloaded image is too large: ${formatBytes(blob.size)} exceeds the ${formatBytes(ALBUM_MAX_SOURCE_BYTES)} per-file cap.`);
   return await new Promise((resolve, reject)=>{
     const r = new FileReader();
     r.onload = ()=>resolve(r.result);
@@ -4386,7 +4506,7 @@ function openAlbumUrlImportModal(){
   UI.openModal({
     title: "Import Image from URL",
     body: `<div class="info-box" style="margin-bottom:16px">${UI.icon("link")}
-        <span>The image is downloaded, resized and re-encoded as JPEG (quality ${ALBUM_JPEG_QUALITY}). Some servers block cross-origin downloads — if that happens, download the image and import it as a file instead.</span></div>
+        <span>The image is downloaded, resized and re-encoded as JPEG (quality ${ALBUM_JPEG_QUALITY}). Source cap: ${formatBytes(ALBUM_MAX_SOURCE_BYTES)}. Some servers block cross-origin downloads — if that happens, download the image and import it as a file instead.</span></div>
       <div class="field"><label class="label" for="al-url">Image URL</label>
         <input class="input" id="al-url" type="url" autofocus placeholder="https://example.com/photo.jpg"></div>
       <div class="field"><label class="label" for="al-name">File name (optional)</label>
@@ -4428,7 +4548,7 @@ Views.album = {
     return `
       <div class="view-head">
         <div><h1>Personal Album</h1>
-          <div class="sub">Private image vault · ${items.length} image${items.length===1?"":"s"} · ${formatBytes(total)} stored.${DEMO_MODE ? ` Limit: ${DEMO_LIMITS.albumFiles}.` : ""} ${sel ? "Click rows to select." : "Double-click an item to view it."}</div></div>
+          <div class="sub">Private image vault · ${items.length} image${items.length===1?"":"s"} · ${formatBytes(total)} stored.${DEMO_MODE ? ` Limit: ${DEMO_LIMITS.albumFiles}.` : ""} Up to ${formatBytes(ALBUM_MAX_SOURCE_BYTES)} source per image. ${sel ? "Click rows to select." : "Double-click an item to view it."}</div></div>
         <div class="head-actions">
           ${sel ? `<button class="btn primary" data-action="sel.cancel" data-view="album">${UI.icon("check","ic-sm")} Done</button>`
                 : `<button class="btn" data-action="sel.enter" data-view="album" ${items.length===0?"disabled":""}>${UI.icon("check-square","ic-sm")} Select</button>`}
@@ -4442,7 +4562,7 @@ Views.album = {
       ${sel ? "" : `<div id="album-paste-zone" class="album-paste-zone" tabindex="0" style="margin-bottom:16px">
         <div style="display:flex;justify-content:center;color:var(--text-3)">${UI.icon("image","ic-lg")}</div>
         <div style="font-weight:600;margin-top:10px">Paste or drop images here</div>
-        <div class="tiny" style="margin-top:6px">Click this area, then press <strong>Ctrl/Cmd&nbsp;+&nbsp;V</strong> with an image in your clipboard — or drag &amp; drop image files anywhere on this page. Each image is resized (max ${ALBUM_MAX_DIM}px) and re-encoded as JPEG quality ${ALBUM_JPEG_QUALITY}.</div>
+        <div class="tiny" style="margin-top:6px">Click this area, then press <strong>Ctrl/Cmd&nbsp;+&nbsp;V</strong> with an image in your clipboard — or drag &amp; drop image files anywhere on this page. Up to ${formatBytes(ALBUM_MAX_SOURCE_BYTES)} per source image. Each image is resized (max ${ALBUM_MAX_DIM}px) and re-encoded as JPEG quality ${ALBUM_JPEG_QUALITY}.</div>
       </div>`}
       ${items.length ? `<div class="card" id="album-list" style="overflow:hidden;padding:6px;display:flex;flex-direction:column;gap:6px">${listHtml}<div data-filter-empty style="display:none">${UI.emptyState("search","No matches","Try a different search term.")}</div></div>`
         : `<div class="card">${UI.emptyState("image","No images yet","Paste an image, import a file, or add one from a URL to get started.")}</div>`}`;
@@ -4710,6 +4830,9 @@ async function driveImportFileWithSuggestion(file, targetDir){
     openDemoUpsell("Personal Drive files", DEMO_LIMITS.driveFiles);
     return null;
   }
+  if(file.size > DRIVE_FILE_MAX_BYTES){
+    throw new Error(`File is too large: ${formatBytes(file.size)} exceeds the ${formatBytes(DRIVE_FILE_MAX_BYTES)} per-file cap.`);
+  }
   const ext = extOf(file.name);
   if(isImageExt(ext) && ext !== "svg"){
     const choice = await promptImageSuggestion(file.name);
@@ -4841,7 +4964,7 @@ Views.drive = {
     return `
       <div class="view-head">
         <div><h1>Personal Drive</h1>
-          <div class="sub">${fileCount} file${fileCount===1?"":"s"} · ${folderCount} folder${folderCount===1?"":"s"} · ${esc(formatBytes(totalBytes))} used.${DEMO_MODE ? ` Limit: ${DEMO_LIMITS.driveFiles} files.` : ""} Files are encrypted inside your workspace.</div></div>
+          <div class="sub">${fileCount} file${fileCount===1?"":"s"} · ${folderCount} folder${folderCount===1?"":"s"} · ${esc(formatBytes(totalBytes))} used.${DEMO_MODE ? ` Limit: ${DEMO_LIMITS.driveFiles} files.` : ""} Up to ${formatBytes(DRIVE_FILE_MAX_BYTES)} per file. Files are encrypted in your IndexedDB workspace.</div></div>
         <div class="head-actions">
           ${searchInputHtml("drive-search","Search in drive…","Search files")}
           ${viewToggleHtml("Drive view mode","drive.setView",view)}
@@ -4892,7 +5015,7 @@ Views.drive = {
           try{
             const r = await driveImportFileWithSuggestion(f, targetDir);
             if(r) added++;
-          }catch(err){ failed++; console.warn("[WaceSpork] drive import failed:", err); }
+          }catch(err){ failed++; UI.toast(err.message || "Could not add that file.", "error"); }
         }
         if(added || failed){
           Store.save(); refresh();
@@ -5190,7 +5313,7 @@ Views.settings = {
           <div class="set-row"><div class="label-col"><div class="t">Lock now</div><div class="d">Hide the workspace and return to the PIN screen.</div></div>
             <div class="set-actions"><button class="btn" data-action="app.lock">${UI.icon("lock","ic-sm")} Lock Workspace</button></div></div>
           <div class="set-row" style="display:block">
-            <div class="info-box">${UI.icon("info")}<span>${Security.available ? "Your workspace is encrypted at rest with AES-GCM using a key derived from your PIN (PBKDF2-SHA256). Browser-local security is only as strong as the device and browser profile it runs on." : "This browser context does not expose the Web Crypto API, so your workspace is stored <strong>without encryption</strong>."}</span></div>
+            <div class="info-box">${UI.icon("info")}<span>${Security.available ? "Your workspace is encrypted at rest with AES-GCM using a key derived from your PIN (PBKDF2-SHA256). The encrypted envelope is stored in IndexedDB. Browser-local security is only as strong as the device and browser profile it runs on." : "This browser context does not expose the Web Crypto API, so your workspace is stored <strong>without encryption</strong>."}</span></div>
           </div>
         </section>
         <section class="card set-section">
@@ -5263,12 +5386,12 @@ Views.settings = {
           <div class="card-head"><h3>Workspace &amp; backups</h3>${UI.icon("download","ic-sm")}</div>
           <div class="set-row">
             <div class="label-col"><div class="t">Storage usage</div>
-              <div class="d">Estimated share of the 5 MB encrypted backup budget. Warns at ${STORAGE_WARN_PCT}%.</div></div>
+              <div class="d">Estimated share of your local IndexedDB budget (${formatBytes(STORAGE_LIMIT_BYTES)}). Warns at ${STORAGE_WARN_PCT}%.</div></div>
             <div class="set-actions"><span class="storage-pill${storageWarn?" warn":""}">${storageBar}<span>${esc(storageLabel)}</span></span></div>
           </div>
           <div class="set-row" style="display:block">
             <div class="info-box">${UI.icon("drive")}
-              <span>Personal Drive: ${driveFileCountNum} file${driveFileCountNum===1?"":"s"} · ${esc(formatBytes(driveBytes))} raw. Personal Album: ${esc(formatBytes(albumBytes))}. App files: ${esc(formatBytes(appsFilesTotalBytes))}.</span>
+              <span>Personal Drive: ${driveFileCountNum} file${driveFileCountNum===1?"":"s"} · ${esc(formatBytes(driveBytes))} raw (up to ${formatBytes(DRIVE_FILE_MAX_BYTES)} per file). Personal Album: ${esc(formatBytes(albumBytes))} (up to ${formatBytes(ALBUM_MAX_SOURCE_BYTES)} source per image). App files: ${esc(formatBytes(appsFilesTotalBytes))}. Storage backend: <strong>IndexedDB</strong>.</span>
             </div>
           </div>
           <div class="set-row"><div class="label-col"><div class="t">Encrypted backup</div><div class="d">${DEMO_MODE ? "Backup export is available in the demo. Backup <strong>import</strong> requires the full version." : "Export or import a backup protected by a separate recovery password."}</div></div>
@@ -5283,17 +5406,18 @@ Views.settings = {
                 : `<button class="btn" data-action="settings.loadDemo">Load sample data</button>`}
             </div></div>
           <div class="set-row"><div class="label-col"><div class="t" style="color:var(--danger)">Reset workspace</div>
-            <div class="d">Permanently erase this workspace from this browser and start fresh.</div></div>
+            <div class="d">Permanently erase this workspace from this browser (including IndexedDB) and start fresh.</div></div>
             <div class="set-actions"><button class="btn danger" data-action="settings.reset">${UI.icon("alert","ic-sm")} Reset Workspace</button></div></div>
         </section>
         <section class="card set-section">
           <div class="card-head"><h3>About</h3>${UI.icon("info","ic-sm")}</div>
-          <div class="set-row"><div class="label-col"><div class="t">WaceSpork</div><div class="d">Personal Workspace — version 3.5.4${DEMO_MODE ? " · DEMO" : ""}</div></div></div>
-          <div class="set-row"><div class="label-col"><div class="t">Storage schema</div><div class="d">Version ${Store.data.version} · browser localStorage</div></div></div>
+          <div class="set-row"><div class="label-col"><div class="t">WaceSpork</div><div class="d">Personal Workspace — version 3.6.0${DEMO_MODE ? " · DEMO" : ""}</div></div></div>
+          <div class="set-row"><div class="label-col"><div class="t">Storage schema</div><div class="d">Version ${Store.data.version} · workspace envelope in IndexedDB · security record in localStorage</div></div></div>
+          <div class="set-row"><div class="label-col"><div class="t">Per-file upload cap</div><div class="d">${formatBytes(PER_FILE_MAX_BYTES)} for Personal Drive and Personal Album (each)</div></div></div>
           <div class="set-row"><div class="label-col"><div class="t">Encryption</div><div class="d">${Security.available?"PBKDF2-SHA256 + AES-GCM 256":"Unavailable in this browser context"}</div></div></div>
           <div class="set-row"><div class="label-col"><div class="t">Created</div><div class="d">${esc(fmtDateTime(Store.data.createdAt))}</div></div></div>
           <div class="set-row" style="display:block"><div class="info-box">${UI.icon("shield")}
-            <span>WaceSpork is local-first. Imported HTML Web-Apps run inside a sandboxed iframe with an opaque origin — they cannot read this workspace's storage, cookies or your PIN. Personal Album, Personal Drive, Notepad and app data are all encrypted inside your workspace; Album, Drive and Notepad additionally re-verify your PIN on every visit. Your profile picture is kept unencrypted in this browser so it can be shown on the lock screen — the only workspace item not encrypted at rest.</span></div></div>
+            <span>WaceSpork is local-first. The encrypted workspace lives in IndexedDB; only the small security record (used to verify your PIN) and your preferences are kept in localStorage. Imported HTML Web-Apps run inside a sandboxed iframe with an opaque origin — they cannot read this workspace's storage, cookies or your PIN. Personal Album, Personal Drive, Notepad and app data are all encrypted inside your workspace; Album, Drive and Notepad additionally re-verify your PIN on every visit. Your profile picture is kept unencrypted so it can be shown on the lock screen — the only workspace item not encrypted at rest.</span></div></div>
         </section>
       </div>`;
   },
@@ -5343,9 +5467,10 @@ function openEncryptedExportModal(){
           let payload;
           if(hasWorkspace && Store.data){ payload = Store.buildBackupObject(); }
           else {
-            const raw = localStorage.getItem(LS.WORKSPACE);
-            if(!raw) throw new Error("There is no workspace data to export.");
-            let envelope; try{ envelope = JSON.parse(raw); }catch(e){ throw new Error("Stored workspace data is damaged."); }
+            let envelope = null;
+            try{ envelope = await IDB.get(IDB_WORKSPACE_KEY); }catch(e){}
+            if(!envelope){ const raw = localStorage.getItem(LS.LEGACY_WORKSPACE); if(raw){ try{ envelope = JSON.parse(raw); }catch(e){} } }
+            if(!envelope) throw new Error("There is no workspace data to export.");
             payload = { format:"wacespork-raw-envelope", v:1, exportedAt:nowISO(), app:{ name:"WaceSpork", schemaVersion: SCHEMA_VERSION }, note:"Raw encrypted workspace envelope. Requires the original PIN to decrypt inside WaceSpork.", securityRecord: Store.securityRecord(), envelope };
           }
           const envelope = await Security.encryptBackup(p1, payload);
@@ -5562,7 +5687,7 @@ function setupShell(inner, stepIndex){
   const dots = [1,2,3,4].map((n)=>`<div class="step-dot${n<=stepIndex?" on":""}"></div>`).join("");
   return `<div class="setup-card">
     <div class="brand" style="margin-bottom:4px"><div class="brand-mark" aria-hidden="true">W</div>
-      <div><div class="brand-name">WaceSpork</div><div class="tiny">Personal Workspace · V3.5.4 · ${DEMO_MODE ? "DEMO" : ""}</div></div></div>
+      <div><div class="brand-name">WaceSpork</div><div class="tiny">Personal Workspace · V3.6.0 · ${DEMO_MODE ? "DEMO" : ""}</div></div></div>
     <div class="steps" aria-hidden="true">${dots}</div>
     ${inner}
   </div>`;
@@ -5689,6 +5814,7 @@ function renderSetup(){
         await Store.create(SetupState.pin, { name: SetupState.name, avatar: SetupState.avatar }, SetupState.theme, SetupState.demo, SetupState.importedWorkspace);
         SetupState.busy = false; SetupState.step = 4; renderSetup();
       }catch(e){
+        console.error("[WaceSpork] create failed:", e);
         SetupState.busy = false; SetupState.step = 3;
         SetupState.error = "Could not create the workspace. Please try again."; renderSetup();
         UI.toast("Could not create the workspace.","error");
@@ -5778,7 +5904,7 @@ function showLock(){
       </div>
       <div style="text-align:center;margin-top:26px;display:flex;flex-direction:column;gap:8px;align-items:center">
         <button class="btn ghost sm" id="lock-reset" type="button">Forgot your PIN? Reset workspace</button>
-        <span class="tiny" style="max-width:330px">Resetting erases this browser's workspace data. It never requires your PIN.</span>
+        <span class="tiny" style="max-width:330px">Resetting erases this browser's workspace data (including IndexedDB). It never requires your PIN.</span>
       </div>
     </div>`;
   const doUnlock = async (pin)=>{
@@ -5842,7 +5968,7 @@ function openResetFlow(){
         <button type="button" class="icon-btn" data-modal-close aria-label="Close dialog">${UI.icon("x")}</button></div>
       <div class="modal-body">
         <div class="warn-box" style="margin-bottom:18px">${UI.icon("alert")}
-          <span>This will permanently remove the current workspace data from this browser — notes, contacts, meetings, events, shortcuts, apps, app files, Personal Drive files, your profile, your Home layout and your PIN. Personal Album images are also erased.</span></div>
+          <span>This will permanently remove the current workspace data from this browser — notes, contacts, meetings, events, shortcuts, apps, app files, Personal Drive files, your profile, your Home layout and your PIN. Personal Album images are also erased. The encrypted envelope in <strong>IndexedDB</strong> will be cleared.</span></div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-radius:11px;background:var(--surface-2);border:1px solid var(--border);flex-wrap:wrap">
           <div><div style="font-weight:600;font-size:.88rem">Export an encrypted backup first</div>
             <div class="tiny">Strongly recommended — this is the only way to bring your data back. The file is protected by a recovery password you choose.</div></div>
@@ -5947,13 +6073,16 @@ function bindGlobalControls(){
     })();
   });
 }
-function boot(){
+async function boot(){
   Theme.apply(Store.prefs().theme || "light");
   bindGlobalControls();
   SearchPanel.init();
   wireAppStorageBridge();
   wireAppFileBridge();
   applySidebarPrefs();
+  /* Warm up IndexedDB so the very first save is fast. */
+  try{ await IDB.open(); }
+  catch(e){ console.warn("[WaceSpork] IndexedDB unavailable; falling back to legacy localStorage-only mode.", e); }
   if(!Store.exists()){ showSetup(); return; }
   showLock();
 }
