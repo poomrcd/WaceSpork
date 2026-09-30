@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>WaceSpork — Your entire workspace in one HTML file</title>
-<meta name="description" content="9 modules. One HTML file. Encrypted with your PIN. No account, no subscription, no server. $19 one-time.">
+<meta name="description" content="9 modules. One HTML file. Encrypted with your PIN. IndexedDB-backed, high-capacity local storage. No account, no subscription, no server. Your data never leaves your device. $19 one-time.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230f172a'/%3E%3Cstop offset='1' stop-color='%231e293b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ctext x='32' y='45' font-family='Arial,sans-serif' font-size='38' font-weight='bold' fill='%23fff' text-anchor='middle'%3EW%3C/text%3E%3C/svg%3E">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -262,6 +262,21 @@ img{max-width:100%;display:block}
 .trust h4{font-size:.98rem;margin-bottom:6px}
 .trust p{font-size:.84rem;color:var(--text-2);line-height:1.5}
 
+/* ---------- Proof / Verify ---------- */
+.proof{background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.proof-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;max-width:920px;margin:0 auto}
+@media (max-width:700px){.proof-grid{grid-template-columns:1fr}}
+.verify-card{display:flex;gap:16px;padding:24px 22px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);align-items:flex-start;transition:border-color .15s,transform .15s}
+.verify-card:hover{border-color:var(--border-strong);transform:translateY(-2px)}
+.verify-card .vnum{width:34px;height:34px;flex:none;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--accent-text);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;box-shadow:0 4px 10px rgba(15,23,42,.22)}
+.verify-card h4{font-size:.98rem;margin-bottom:7px}
+.verify-card p{font-size:.86rem;color:var(--text-2);line-height:1.6}
+.verify-card code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82em;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:var(--text);border:1px solid var(--border);white-space:nowrap}
+.proof-foot{text-align:center;max-width:700px;margin:34px auto 0;font-size:.94rem;color:var(--text-2);line-height:1.65}
+.proof-foot strong{color:var(--text)}
+.proof-foot .badge{display:inline-flex;align-items:center;gap:7px;margin-top:18px;padding:7px 16px;border-radius:999px;background:color-mix(in srgb,var(--success) 14%,transparent);color:var(--success);font-size:.8rem;font-weight:700;letter-spacing:.03em}
+.proof-foot .badge svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
 /* ---------- FAQ ---------- */
 .faq{max-width:760px;margin:0 auto}
 .faq details{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:0;margin-bottom:12px;overflow:hidden;transition:border-color .15s}
@@ -332,6 +347,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
       <a href="#modules">Modules</a>
       <a href="#compare">Demo vs Full</a>
       <a href="#shots">Screenshots</a>
+      <a href="#proof">Privacy Proof</a>
       <a href="#faq">FAQ</a>
     </div>
     <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
@@ -350,7 +366,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
     <div>
       <span class="hero-eyebrow"><span class="dot"></span>One-time purchase · No subscription</span>
       <h1>Your entire workspace.<br><span class="grad">One HTML file.</span></h1>
-      <p class="hero-sub">Nine modules — Schedule, Notepad, Contacts, Meetings, Personal Album, Personal Drive, Link Shortcuts, Apps, Home dashboard. Encrypted with your PIN. Works offline. Forever. Built for text, documents, and a curated image vault — not a photo library.</p>
+      <p class="hero-sub">Nine modules — Schedule, Notepad, Contacts, Meetings, Personal Album, Personal Drive, Link Shortcuts, Apps, Home dashboard. Encrypted with your PIN. Powered by IndexedDB for high-capacity, secure local archiving. Works offline. Forever. Your data never leaves your device.</p>
       <div class="hero-cta">
         <a href="https://poomrcd.gumroad.com/l/cavqna" class="btn buy lg gumroad-button" data-gumroad="1">
           <svg viewBox="0 0 24 24"><path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 6 3-6M9 21l-3-12M15 21l3-12"/></svg>
@@ -363,6 +379,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
         <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>No server</span>
         <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>Works offline</span>
         <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>AES-GCM encrypted</span>
+        <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>IndexedDB-backed</span>
       </div>
     </div>
     <div class="hero-visual">
@@ -387,8 +404,8 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
       <span>Six places your data lives</span>
       <span>Six chances to lose it</span>
     </div>
-    <p><strong>WaceSpork replaces them with a single HTML file.</strong> Everything runs locally. Everything is encrypted behind your 6-digit PIN. Nothing leaves your device.</p>
-    <p>No install. No account. No subscription. No server. Just open the file and work.</p>
+    <p><strong>WaceSpork replaces them with a single HTML file.</strong> Everything runs locally. Everything is encrypted behind your 6-digit PIN. Nothing leaves your device — not to a cloud, not to an analytics server, not anywhere.</p>
+    <p>No install. No account. No subscription. No server. No telemetry. Just open the file and work.</p>
   </div>
 </section>
 
@@ -398,7 +415,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
     <div class="section-head reveal">
       <span class="eyebrow">Nine modules. One file.</span>
       <h2>Everything you need, nothing you don't.</h2>
-      <p>Every module shares the same encrypted workspace. Add a meeting and it appears in your calendar. Open your private album and it re-verifies your PIN.</p>
+      <p>Every module shares the same encrypted workspace, backed by IndexedDB. Add a meeting and it appears in your calendar. Open your private album and it re-verifies your PIN.</p>
     </div>
     <div class="modules-grid">
       <article class="module-card reveal">
@@ -434,14 +451,14 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
       <article class="module-card reveal">
         <span class="num">06</span>
         <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
-       <h3>Personal Album</h3>
-        <p>PIN-gated image vault for a curated set of images. Paste, drop, or import from URL. Auto-compressed to JPEG. Private viewer.</p>
+        <h3>Personal Album</h3>
+        <p>PIN-gated image vault backed by IndexedDB. Paste, drop, or import from URL. Auto-compressed to JPEG. Store hundreds of images locally with room to grow.</p>
       </article>
       <article class="module-card reveal">
         <span class="num">07</span>
         <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h.01M11 16.5h.01"/></svg></div>
         <h3>Personal Drive</h3>
-        <p>PIN-gated file vault for documents — PDFs, spreadsheets, configs. Nested folders, breadcrumbs, drag-drop upload, multi-select, previews.</p>
+        <p>PIN-gated file vault for documents — PDFs, spreadsheets, configs. IndexedDB-backed with nested folders, breadcrumbs, drag-drop upload, multi-select, and previews. Built for serious local archiving.</p>
       </article>
       <article class="module-card reveal">
         <span class="num">08</span>
@@ -478,6 +495,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
         <ul>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>All 9 modules, fully functional</li>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>Encryption, PIN, auto-lock</li>
+          <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>IndexedDB-backed local storage</li>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>Export encrypted backup</li>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>3 widgets · 3 events · 3 notes</li>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>3 contacts · 3 meetings · 3 shortcuts</li>
@@ -500,10 +518,10 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
         <ul>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span><strong style="color:var(--text)">Unlimited</strong> widgets, events, notes</li>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span><strong style="color:var(--text)">Unlimited</strong> contacts, meetings, shortcuts</li>
-          <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span><strong style="color:var(--text)">Unlimited</strong> apps, album images, drive files</li>
+          <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span><strong style="color:var(--text)">Unlimited</strong> apps, album images, drive files <span style="color:var(--text-3)">(IndexedDB capacity)</span></li>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>Encrypted backup <strong style="color:var(--text)">import</strong></li>
           <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>One file, works offline, forever</li>
-          <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>No subscription, no account</li>
+          <li><span class="ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg></span>No subscription, no account, no tracking</li>
         </ul>
         <a href="https://poomrcd.gumroad.com/l/cavqna" class="btn buy gumroad-button" data-gumroad="1">
           <svg viewBox="0 0 24 24"><path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 6 3-6M9 21l-3-12M15 21l3-12"/></svg>
@@ -520,7 +538,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
     <div class="section-head reveal">
       <span class="eyebrow">See it in action</span>
       <h2>Look inside the workspace.</h2>
-      <p>Every screen is a module. Every module shares the same encrypted workspace.</p>
+      <p>Every screen is a module. Every module shares the same encrypted, IndexedDB-backed workspace.</p>
     </div>
 
     <div class="gallery reveal" id="gallery">
@@ -612,7 +630,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
       <div class="step reveal"><div class="step-num">1</div><h3>Download</h3><p>Grab the single HTML file. No installer, no setup wizard, no dependencies.</p></div>
       <div class="step reveal"><div class="step-num">2</div><h3>Open</h3><p>Double-click it in any modern browser — Chrome, Edge, Safari, Firefox.</p></div>
       <div class="step reveal"><div class="step-num">3</div><h3>Set your PIN</h3><p>Pick a 6-digit PIN. Everything you add is encrypted before it touches disk.</p></div>
-      <div class="step reveal"><div class="step-num">4</div><h3>Work offline</h3><p>Auto-lock after inactivity. Encrypted backups. Nothing ever leaves your device.</p></div>
+      <div class="step reveal"><div class="step-num">4</div><h3>Archive &amp; work offline</h3><p>IndexedDB-backed storage with high capacity. Auto-lock after inactivity. Encrypted backups. Nothing ever leaves your device.</p></div>
     </div>
   </div>
 </section>
@@ -623,6 +641,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
     <div class="section-head reveal">
       <span class="eyebrow">Privacy by design</span>
       <h2>Nothing leaves your device.</h2>
+      <p>Not a slogan — an architectural guarantee. There is no server to receive your data, no account to link it to, and no code path that sends it anywhere.</p>
     </div>
     <div class="privacy-grid">
       <div class="trust reveal">
@@ -638,13 +657,71 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
       <div class="trust reveal">
         <div class="ic"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></div>
         <h4>Portable by design</h4>
-        <p>Export an encrypted backup. Move to another device. Restore everything with one password.</p>
+        <p>Export an encrypted backup from IndexedDB. Move to another device. Restore everything with one password. Your entire archive travels with the file.</p>
       </div>
       <div class="trust reveal">
         <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg></div>
         <h4>Works offline</h4>
         <p>Once you have the file, the internet is optional. Perfect for travel, USB sticks, and restricted environments.</p>
       </div>
+      <div class="trust reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg></div>
+        <h4>Zero telemetry</h4>
+        <p>No pings, no beacons, no crash reports, no usage stats. The app never phones home — because there's no home to phone.</p>
+      </div>
+      <div class="trust reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h4>Your PIN, your key</h4>
+        <p>Your PIN is never stored, never transmitted, never recoverable. Only you can decrypt your workspace.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROOF / VERIFY ============ -->
+<section class="section proof" id="proof">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Proof, not promises</span>
+      <h2>Don't trust us. Verify it yourself.</h2>
+      <p>Every privacy claim on this page is testable in under two minutes, using tools already on your computer. Here's exactly how.</p>
+    </div>
+    <div class="proof-grid">
+      <div class="verify-card reveal">
+        <div class="vnum">1</div>
+        <div>
+          <h4>Pull the plug</h4>
+          <p>Disconnect Wi-Fi, unplug Ethernet, or turn on Airplane Mode. Open WaceSpork and use every module. It all works — because nothing is ever sent anywhere. A cloud app would be dead in seconds. This one doesn't notice.</p>
+        </div>
+      </div>
+      <div class="verify-card reveal">
+        <div class="vnum">2</div>
+        <div>
+          <h4>Watch the Network tab</h4>
+          <p>Open DevTools with <code>F12</code> → <strong>Network</strong> tab. Create notes, upload files, add contacts. You'll see <strong>zero outbound requests</strong> to any third-party domain. No analytics. No telemetry. No "phone home."</p>
+        </div>
+      </div>
+      <div class="verify-card reveal">
+        <div class="vnum">3</div>
+        <div>
+          <h4>Read the source</h4>
+          <p>Right-click the page → <strong>View Page Source</strong>. Search for <code>fetch(</code>, <code>XMLHttpRequest</code>, <code>WebSocket</code>, or <code>sendBeacon</code>. You'll find no data-transmission code — because there isn't any. It's one readable HTML file.</p>
+        </div>
+      </div>
+      <div class="verify-card reveal">
+        <div class="vnum">4</div>
+        <div>
+          <h4>Inspect IndexedDB yourself</h4>
+          <p>DevTools → <strong>Application</strong> → <strong>IndexedDB</strong>. You'll see your encrypted records stored locally. Open one — it's ciphertext, unreadable without your PIN. Your data lives on your machine, and only on your machine.</p>
+        </div>
+      </div>
+    </div>
+    <div class="proof-foot reveal">
+      <p>Most apps ask you to <em>trust</em> them. WaceSpork lets you <strong>prove it</strong>. If any of the four tests above fail, we want to know — because that would mean we broke our core promise.</p>
+      <span class="badge">
+        <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+        Zero network calls · Zero accounts · Zero tracking
+      </span>
     </div>
   </div>
 </section>
@@ -657,16 +734,29 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
       <h2>Quick answers.</h2>
     </div>
     <div class="faq">
-      <div class="faq">
-      <details class="reveal"><summary>How much can I store?</summary><div class="answer">WaceSpork shares roughly <strong>5 MB of encrypted storage</strong> across everything — notes, contacts, meetings, images, and files. That's plenty for text, spreadsheets, PDFs, and a small curated Personal Album. It is <strong>not</strong> designed for photo libraries, video, or large media collections. If you need a media archive, keep using your OS gallery or a cloud drive — WaceSpork is the workspace you own around your files, not a replacement for your storage provider.</div></details>
-      <details class="reveal"><summary>Why 5 MB? Why not use IndexedDB?</summary><div class="answer">The whole workspace lives in a single encrypted file that your browser can read and save instantly — offline, on any device, with no server. That's what makes WaceSpork private and portable. The tradeoff is a hard ~5 MB ceiling set by the browser itself. A future version could layer an optional IndexedDB-backed media store alongside the workspace, but it would change the single-file backup model, so it isn't in the current scope.</div></details>
+      <details class="reveal"><summary>How much can I store now?</summary><div class="answer">WaceSpork now uses <strong>IndexedDB</strong>, which gives you dramatically more room than traditional browser storage. Modern browsers typically allocate <strong>hundreds of megabytes to several gigabytes</strong> per origin — enough for thousands of documents, notes, contacts, and a full Personal Album. Exact limits vary by browser and device, but you can archive far more than ever before, all encrypted and fully local.</div></details>
+
+      <details class="reveal"><summary>Why IndexedDB instead of localStorage?</summary><div class="answer">localStorage caps out around <strong>5 MB</strong> and only stores strings — far too limiting for a real workspace. IndexedDB handles large binary data efficiently, supports transactions, and scales to browser-defined limits that are <strong>hundreds of times larger</strong>. Your encrypted workspace stays on your device, but now with the capacity to actually archive files safely.</div></details>
+
+      <details class="reveal"><summary>How do I know you're not collecting my data?</summary><div class="answer">Because there is nowhere for data to go. WaceSpork has <strong>no server, no backend, no API, and no analytics</strong>. It's a single HTML file running entirely in your browser. You can prove it yourself: open DevTools → Network tab, use every feature, and watch for outbound requests. You'll see none. You can even disconnect from the internet completely and keep working.</div></details>
+
       <details class="reveal"><summary>Do I need to install anything?</summary><div class="answer">No. It's a single HTML file that runs in your browser. Double-click and go.</div></details>
-      <details class="reveal"><summary>Does it work offline?</summary><div class="answer">Yes, completely. Once you have the file, you never need the internet again unless you click a shortcut that opens an external website.</div></details>
+
+      <details class="reveal"><summary>Does it work offline?</summary><div class="answer">Yes, completely. Once you have the file, you never need the internet again unless you click a shortcut that opens an external website. Every module — Notepad, Contacts, Meetings, Personal Album, Personal Drive — works with zero connection.</div></details>
+
       <details class="reveal"><summary>Is there a subscription?</summary><div class="answer">No. $19 one-time. No recurring charges, no login server, no upsells. Free updates for life.</div></details>
-      <details class="reveal"><summary>What happens if I forget my PIN?</summary><div class="answer">You can reset the workspace and start fresh, but your encrypted data becomes unrecoverable. There's no recovery code and no backdoor. Export regular encrypted backups and remember your PIN.</div></details>
-      <details class="reveal"><summary>Which browsers work?</summary><div class="answer">Chrome, Edge, Safari, Firefox, and any modern Chromium-based browser.</div></details>
+
+      <details class="reveal"><summary>Is my IndexedDB data still portable?</summary><div class="answer">Yes. Export an encrypted backup from IndexedDB and import it on any device. Your entire archive — notes, contacts, meetings, album images, drive files — travels as a single encrypted file. No cloud, no account, no lock-in.</div></details>
+
+      <details class="reveal"><summary>Does IndexedDB change how backups work?</summary><div class="answer">The backup format stays the same — one encrypted file you can save anywhere. The difference is capacity: you can now back up and restore <strong>much larger workspaces</strong> than the old 5 MB ceiling allowed. Export regularly and keep your PIN safe.</div></details>
+
+      <details class="reveal"><summary>What happens if I forget my PIN?</summary><div class="answer">You can reset the workspace and start fresh, but your encrypted data becomes unrecoverable. There's no recovery code and no backdoor — that's what keeps your data safe from everyone, including us. Export regular encrypted backups and remember your PIN.</div></details>
+
+      <details class="reveal"><summary>Which browsers work?</summary><div class="answer">Chrome, Edge, Safari, Firefox, and any modern Chromium-based browser. IndexedDB is supported in all of them.</div></details>
+
       <details class="reveal"><summary>Does the demo expire?</summary><div class="answer">No. The demo works forever with the same 3-item limits. Upgrade whenever you're ready.</div></details>
-      <details class="reveal"><summary>Can I use it on multiple devices?</summary><div class="answer">Yes. Export an encrypted backup from one device, import it on another. Your entire workspace travels with the file.</div></details>
+
+      <details class="reveal"><summary>Can I use it on multiple devices?</summary><div class="answer">Yes. Export an encrypted backup from one device, import it on another. Your entire workspace travels with the file — no sync server required.</div></details>
     </div>
   </div>
 </section>
@@ -676,7 +766,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
   <div class="container">
     <div class="cta-card reveal">
       <h2>Own your workspace.</h2>
-      <p>One file. Nine modules. Encrypted with your PIN. Yours forever.</p>
+      <p>One file. Nine modules. Encrypted with your PIN. IndexedDB-backed, high-capacity, and completely offline. Yours forever.</p>
       <div class="price-line">
         <span class="amount">$19</span>
         <span class="period">one-time</span>
@@ -712,7 +802,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
       <span class="brand-mark" style="width:28px;height:28px;font-size:.85rem;border-radius:8px">W</span>
       <span style="color:var(--text-2);font-weight:600">WaceSpork</span>
       <span>·</span>
-      <span>V3.5.4</span>
+      <span>V4.0.0</span>
     </div>
     <div class="footer-links">
       <a href="mailto:poom.rcd@proton.me">poom.rcd@proton.me</a>
@@ -721,7 +811,7 @@ footer{padding:44px 0 60px;font-size:.86rem;color:var(--text-3)}
     </div>
   </div>
   <div class="container" style="margin-top:22px;font-size:.78rem;color:var(--text-3);text-align:center">
-    Local-first personal workspace. No server, no account, no tracking.
+    Local-first personal workspace. IndexedDB-backed. No server, no account, no tracking.
   </div>
 </footer>
 
